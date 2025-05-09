@@ -10,6 +10,10 @@ def main():
     parser.add_argument("--fps", type=int, default=1)
     parser.add_argument("--chunked", action="store_true", help="Use chunked summarization (for long videos)")
     parser.add_argument("--timeline-json", type=str, help="If set, output the timeline as a JSON file and exit.")
+    parser.add_argument("--detect-labels", action="store_true", default=True, help="Enable label detection (default: on)")
+    parser.add_argument("--detect-faces", action="store_true", help="Enable face detection")
+    parser.add_argument("--detect-celebrities", action="store_true", help="Enable celebrity recognition")
+    parser.add_argument("--detect-text", action="store_true", help="Enable text-in-image detection (OCR)")
     args = parser.parse_args()
 
 
@@ -17,10 +21,22 @@ def main():
     rek = boto3.client("rekognition")
     events = []
     for ts, frame_path in frames:
+        event = {"t": ts}
         with open(frame_path, "rb") as img:
-            resp = rek.detect_labels(Image={'Bytes': img.read()},
-                                     MaxLabels=10, MinConfidence=60)
-        events.append({"t": ts, "labels": resp["Labels"]})
+            img_bytes = img.read()
+            if args.detect_labels:
+                resp = rek.detect_labels(Image={'Bytes': img_bytes}, MaxLabels=10, MinConfidence=60)
+                event["labels"] = resp.get("Labels", [])
+            if args.detect_faces:
+                resp = rek.detect_faces(Image={'Bytes': img_bytes}, Attributes=["ALL"])
+                event["faces"] = resp.get("FaceDetails", [])
+            if args.detect_celebrities:
+                resp = rek.recognize_celebrities(Image={'Bytes': img_bytes})
+                event["celebrities"] = resp.get("CelebrityFaces", [])
+            if args.detect_text:
+                resp = rek.detect_text(Image={'Bytes': img_bytes})
+                event["text_detections"] = resp.get("TextDetections", [])
+        events.append(event)
 
     timeline = build_timeline(events)                       # + transcript if any
 
