@@ -4,10 +4,13 @@ from collator import build_timeline
 from summarizer import summarize
 
 def main():
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", required=True)
     parser.add_argument("--fps", type=int, default=1)
+    parser.add_argument("--chunked", action="store_true", help="Use chunked summarization (for long videos)")
     args = parser.parse_args()
+
 
     frames = sample_frames(args.video, fps=args.fps)        # ffmpeg
     rek = boto3.client("rekognition")
@@ -19,7 +22,12 @@ def main():
         events.append({"t": ts, "labels": resp["Labels"]})
 
     timeline = build_timeline(events)                       # + transcript if any
-    print("Summary:\n", summarize(timeline))               # GPT‑4o
+
+    if args.chunked:
+        from summarizer import summarize_chunked
+        print("Summary (chunked):\n", summarize_chunked(timeline))
+    else:
+        print("Summary:\n", summarize(timeline))
 
 if __name__ == "__main__":
     main()
