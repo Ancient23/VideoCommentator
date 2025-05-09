@@ -9,6 +9,7 @@ def main():
     parser.add_argument("--video", required=True)
     parser.add_argument("--fps", type=int, default=1)
     parser.add_argument("--chunked", action="store_true", help="Use chunked summarization (for long videos)")
+    parser.add_argument("--timeline-json", type=str, help="If set, output the timeline as a JSON file and exit.")
     args = parser.parse_args()
 
 
@@ -22,6 +23,12 @@ def main():
         events.append({"t": ts, "labels": resp["Labels"]})
 
     timeline = build_timeline(events)                       # + transcript if any
+
+    if args.timeline_json:
+        with open(args.timeline_json, "w", encoding="utf-8") as f:
+            json.dump(timeline, f, ensure_ascii=False, indent=2)
+        print(f"Timeline written to {args.timeline_json}")
+        return
 
     if args.chunked:
         from summarizer import summarize_chunked
