@@ -1,12 +1,14 @@
-import argparse, json, tempfile, subprocess, boto3, openai
+import argparse, json, tempfile, subprocess, boto3, openai, os
 from sampler import sample_frames
 from collator import build_timeline
 from summarizer import summarize
+from s3_utils import is_s3_uri, download_from_s3
+from vision import analyze_video_s3
 
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video", type=str, help="Input video file to process (required for muxing)")
+    parser.add_argument("--video", type=str, help="Input video file to process. Can be a local path or S3 URL (s3://bucket/key)")
     parser.add_argument("--input-timeline", type=str, help="Use a pregenerated timeline JSON instead of processing a video")
     parser.add_argument("--fps", type=int, default=1)
     parser.add_argument("--chunked", action="store_true", help="Use chunked summarization (for long videos)")
@@ -27,27 +29,33 @@ def main():
         with open(args.input_timeline, "r", encoding="utf-8") as f:
             timeline = json.load(f)
     elif args.video:
-        frames = sample_frames(args.video, fps=args.fps)        # ffmpeg
-        rek = boto3.client("rekognition")
-        events = []
-        for ts, frame_path in frames:
-            event = {"t": ts}
-            with open(frame_path, "rb") as img:
-                img_bytes = img.read()
-                if args.detect_labels:
-                    resp = rek.detect_labels(Image={'Bytes': img_bytes}, MaxLabels=10, MinConfidence=60)
-                    event["labels"] = resp.get("Labels", [])
-                if args.detect_faces:
-                    resp = rek.detect_faces(Image={'Bytes': img_bytes}, Attributes=["ALL"])
-                    event["faces"] = resp.get("FaceDetails", [])
-                if args.detect_celebrities:
-                    resp = rek.recognize_celebrities(Image={'Bytes': img_bytes})
-                    event["celebrities"] = resp.get("CelebrityFaces", [])
-                if args.detect_text:
-                    resp = rek.detect_text(Image={'Bytes': img_bytes})
-                    event["text_detections"] = resp.get("TextDetections", [])
-            events.append(event)
-        timeline = build_timeline(events)                       # + transcript if any
+        # For S3 videos, use Rekognition Video APIs directly
+        if is_s3_uri(args.video):
+            events = analyze_video_s3(args.video)
+            timeline = build_timeline(events)
+        # For local videos, use frame sampling approach
+        else:
+            frames = sample_frames(args.video, fps=args.fps)        # ffmpeg
+            rek = boto3.client("rekognition")
+            events = []
+            for ts, frame_path in frames:
+                event = {"t": ts}
+                with open(frame_path, "rb") as img:
+                    img_bytes = img.read()
+                    if args.detect_labels:
+                        resp = rek.detect_labels(Image={'Bytes': img_bytes}, MaxLabels=10, MinConfidence=60)
+                        event["labels"] = resp.get("Labels", [])
+                    if args.detect_faces:
+                        resp = rek.detect_faces(Image={'Bytes': img_bytes}, Attributes=["ALL"])
+                        event["faces"] = resp.get("FaceDetails", [])
+                    if args.detect_celebrities:
+                        resp = rek.recognize_celebrities(Image={'Bytes': img_bytes})
+                        event["celebrities"] = resp.get("CelebrityFaces", [])
+                    if args.detect_text:
+                        resp = rek.detect_text(Image={'Bytes': img_bytes})
+                        event["text_detections"] = resp.get("TextDetections", [])
+                events.append(event)
+            timeline = build_timeline(events)                       # + transcript if any
     else:
         parser.error("You must provide either --video or --input-timeline.")
 
@@ -80,8 +88,21 @@ def main():
                 print("Muxing audio to video...")
                 if not concat_path:
                     concat_path = concat_audio_segments(audio_segments)
-                muxed_path = mux_audio_to_video(args.video, concat_path)
-                print(f"Muxed video file: {muxed_path}")
+                # If video is in S3, download it first
+                video_path = args.video
+                if is_s3_uri(video_path):
+                    print("Downloading video from S3...")
+                    video_path = download_from_s3(video_path)
+                try:
+                    muxed_path = mux_audio_to_video(video_path, concat_path)
+                    print(f"Muxed video file: {muxed_path}")
+                finally:
+                    # Clean up downloaded video if it was from S3
+                    if video_path != args.video:
+                        try:
+                            os.unlink(video_path)
+                        except:
+                            pass
     else:
         if args.chunked:
             print("Summary (chunked):\n", summarize_chunked(timeline))
