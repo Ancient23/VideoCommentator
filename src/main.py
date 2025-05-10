@@ -19,6 +19,8 @@ def main():
     parser.add_argument("--style", type=str, default="Sports Commentator", help="Voiceover style (e.g. 'Sports Commentator', 'Morgan Freeman', 'YouTube influencer', etc.)")
     parser.add_argument("--voiceover", action="store_true", help="Generate a voiceover script instead of a summary.")
     parser.add_argument("--voiceover-audio", action="store_true", help="Generate TTS audio for the voiceover script, aligned to video events.")
+    parser.add_argument("--voiceover-concat", action="store_true", help="Concatenate TTS audio segments into a single audio file.")
+    parser.add_argument("--voiceover-mux", action="store_true", help="Mux the concatenated TTS audio back into the video.")
     args = parser.parse_args()
 
 
@@ -56,6 +58,7 @@ def main():
 
     from summarizer import summarize_chunked, generate_voiceover_script, generate_voiceover_script_chunked
     from tts import generate_timed_voiceover, tts_openai
+    from audio_utils import concat_audio_segments, mux_audio_to_video
     if args.voiceover:
         if args.chunked:
             script = generate_voiceover_script_chunked(timeline, style=args.style)
@@ -67,6 +70,17 @@ def main():
             audio_segments = generate_timed_voiceover(timeline, script, tts_func=tts_openai)
             for ts, audio_path in audio_segments:
                 print(f"Audio segment at {ts:.2f}s: {audio_path}")
+            concat_path = None
+            if args.voiceover_concat:
+                print("Concatenating audio segments...")
+                concat_path = concat_audio_segments(audio_segments)
+                print(f"Concatenated audio file: {concat_path}")
+            if args.voiceover_mux and args.video:
+                print("Muxing audio to video...")
+                if not concat_path:
+                    concat_path = concat_audio_segments(audio_segments)
+                muxed_path = mux_audio_to_video(args.video, concat_path)
+                print(f"Muxed video file: {muxed_path}")
     else:
         if args.chunked:
             print("Summary (chunked):\n", summarize_chunked(timeline))
