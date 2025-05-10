@@ -1,9 +1,9 @@
-import argparse, json, tempfile, subprocess, boto3, openai
+import argparse, json, tempfile, subprocess, boto3, openai, os
 from sampler import sample_frames
 from collator import build_timeline
 from summarizer import summarize
-from .s3_utils import is_s3_uri
-from .vision import analyze_video_s3
+from s3_utils import is_s3_uri, download_from_s3
+from vision import analyze_video_s3
 
 def main():
 
@@ -88,8 +88,21 @@ def main():
                 print("Muxing audio to video...")
                 if not concat_path:
                     concat_path = concat_audio_segments(audio_segments)
-                muxed_path = mux_audio_to_video(args.video, concat_path)
-                print(f"Muxed video file: {muxed_path}")
+                # If video is in S3, download it first
+                video_path = args.video
+                if is_s3_uri(video_path):
+                    print("Downloading video from S3...")
+                    video_path = download_from_s3(video_path)
+                try:
+                    muxed_path = mux_audio_to_video(video_path, concat_path)
+                    print(f"Muxed video file: {muxed_path}")
+                finally:
+                    # Clean up downloaded video if it was from S3
+                    if video_path != args.video:
+                        try:
+                            os.unlink(video_path)
+                        except:
+                            pass
     else:
         if args.chunked:
             print("Summary (chunked):\n", summarize_chunked(timeline))

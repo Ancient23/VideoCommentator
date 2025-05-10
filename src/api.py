@@ -3,8 +3,8 @@ from fastapi import FastAPI, HTTPException
 from summarizer import summarize
 from sampler import sample_frames
 from collator import build_timeline
-from .s3_utils import is_s3_uri
-from .vision import analyze_video_s3
+from s3_utils import is_s3_uri
+from vision import analyze_video_s3
 import boto3
 
 app = FastAPI()

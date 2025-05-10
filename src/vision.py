@@ -2,7 +2,7 @@
 import time
 import boto3
 from typing import List, Dict
-from .s3_utils import is_s3_uri, parse_s3_uri
+from s3_utils import is_s3_uri, parse_s3_uri
 
 def detect_labels_on_frames(frames: List[str], max_labels=10, min_conf=60) -> List[Dict]:
     """Detect labels on a list of local image frame files."""

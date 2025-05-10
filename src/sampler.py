@@ -6,7 +6,7 @@ import sys
 import tempfile
 from typing import List, Tuple
 import ffmpeg
-from .s3_utils import is_s3_uri, download_from_s3
+from s3_utils import is_s3_uri, download_from_s3
 
 # Prepend the bundled ffmpeg bin directory to PATH if not already present
 FFMPEG_BIN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tools', 'ffmpeg-7.1.1-essentials_build', 'bin'))
