@@ -16,6 +16,8 @@ def main():
     parser.add_argument("--detect-faces", action="store_true", help="Enable face detection")
     parser.add_argument("--detect-celebrities", action="store_true", help="Enable celebrity recognition")
     parser.add_argument("--detect-text", action="store_true", help="Enable text-in-image detection (OCR)")
+    parser.add_argument("--style", type=str, default="Sports Commentator", help="Voiceover style (e.g. 'Sports Commentator', 'Morgan Freeman', 'YouTube influencer', etc.)")
+    parser.add_argument("--voiceover", action="store_true", help="Generate a voiceover script instead of a summary.")
     args = parser.parse_args()
 
 
@@ -51,11 +53,17 @@ def main():
         print(f"Timeline written to {args.timeline_json}")
         return
 
-    if args.chunked:
-        from summarizer import summarize_chunked
-        print("Summary (chunked):\n", summarize_chunked(timeline))
+    from summarizer import summarize_chunked, generate_voiceover_script, generate_voiceover_script_chunked
+    if args.voiceover:
+        if args.chunked:
+            print(f"Voiceover script (chunked, style: {args.style}):\n", generate_voiceover_script_chunked(timeline, style=args.style))
+        else:
+            print(f"Voiceover script (style: {args.style}):\n", generate_voiceover_script(timeline, style=args.style))
     else:
-        print("Summary:\n", summarize(timeline))
+        if args.chunked:
+            print("Summary (chunked):\n", summarize_chunked(timeline))
+        else:
+            print("Summary:\n", summarize(timeline))
 
 if __name__ == "__main__":
     main()
