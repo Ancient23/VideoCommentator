@@ -69,19 +69,22 @@ def mux_audio_to_video(video_path: str, audio_path: str, output_path: str = None
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix="_muxed.mp4")
         os.close(fd)
+    
+    # Create the stream objects
     video_stream = ffmpeg.input(video_path)
     audio_stream = ffmpeg.input(audio_path)
-      # Create the stream object
-    stream = (
-        ffmpeg
-        .output(video_stream, audio_stream, output_path,
-                vcodec='copy', acodec='aac')
-        .global_args('-map', '0:v:0', '-map', '1:a:0')
-        .global_args('-y')
-        .overwrite_output()
-    )
     
-    # Print the ffmpeg command
+    # Fix: Remove the map parameter and use simpler stream mapping
+    stream = ffmpeg.output(
+        video_stream.video,
+        audio_stream.audio,
+        output_path,
+        vcodec='copy',  # Copy video codec to avoid re-encoding
+        acodec='aac',    # Convert audio to AAC format
+        shortest=None  # Use the shortest stream
+    ).overwrite_output()
+    
+    # Print the ffmpeg command for debugging
     print("FFmpeg command:", ' '.join(stream.get_args()))
     
     # Run the command
