@@ -69,10 +69,12 @@ def mux_audio_to_video(video_path: str, audio_path: str, output_path: str = None
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix="_muxed.mp4")
         os.close(fd)
+    video_stream = ffmpeg.input(video_path)
+    audio_stream = ffmpeg.input(audio_path)
     (
-        ffmpeg.input(video_path)
-        .output(audio_path)
-        .output(output_path, vcodec='copy', acodec='aac', strict='experimental', shortest=None)
+        ffmpeg
+        .output(video_stream, audio_stream, output_path, vcodec='copy', acodec='aac', shortest=None, **{'map':'0:v:0'})
+        .global_args('-map', '1:a:0')
         .overwrite_output()
         .run(quiet=True)
     )

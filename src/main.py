@@ -6,9 +6,8 @@ from summarizer import summarize
 def main():
 
     parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--video", type=str, help="Input video file to process")
-    group.add_argument("--input-timeline", type=str, help="Use a pregenerated timeline JSON instead of processing a video")
+    parser.add_argument("--video", type=str, help="Input video file to process (required for muxing)")
+    parser.add_argument("--input-timeline", type=str, help="Use a pregenerated timeline JSON instead of processing a video")
     parser.add_argument("--fps", type=int, default=1)
     parser.add_argument("--chunked", action="store_true", help="Use chunked summarization (for long videos)")
     parser.add_argument("--timeline-json", type=str, help="If set, output the timeline as a JSON file and exit.")
@@ -27,7 +26,7 @@ def main():
     if args.input_timeline:
         with open(args.input_timeline, "r", encoding="utf-8") as f:
             timeline = json.load(f)
-    else:
+    elif args.video:
         frames = sample_frames(args.video, fps=args.fps)        # ffmpeg
         rek = boto3.client("rekognition")
         events = []
@@ -49,6 +48,8 @@ def main():
                     event["text_detections"] = resp.get("TextDetections", [])
             events.append(event)
         timeline = build_timeline(events)                       # + transcript if any
+    else:
+        parser.error("You must provide either --video or --input-timeline.")
 
     if args.timeline_json:
         with open(args.timeline_json, "w", encoding="utf-8") as f:
