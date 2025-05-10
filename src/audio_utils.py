@@ -71,11 +71,19 @@ def mux_audio_to_video(video_path: str, audio_path: str, output_path: str = None
         os.close(fd)
     video_stream = ffmpeg.input(video_path)
     audio_stream = ffmpeg.input(audio_path)
-    (
+      # Create the stream object
+    stream = (
         ffmpeg
-        .output(video_stream, audio_stream, output_path, vcodec='copy', acodec='aac', shortest=None, **{'map':'0:v:0'})
-        .global_args('-map', '1:a:0')
+        .output(video_stream, audio_stream, output_path,
+                vcodec='copy', acodec='aac')
+        .global_args('-map', '0:v:0', '-map', '1:a:0')
+        .global_args('-y')
         .overwrite_output()
-        .run(quiet=True)
     )
+    
+    # Print the ffmpeg command
+    print("FFmpeg command:", ' '.join(stream.get_args()))
+    
+    # Run the command
+    stream.run(quiet=True)
     return output_path
