@@ -18,6 +18,7 @@ def main():
     parser.add_argument("--detect-text", action="store_true", help="Enable text-in-image detection (OCR)")
     parser.add_argument("--style", type=str, default="Sports Commentator", help="Voiceover style (e.g. 'Sports Commentator', 'Morgan Freeman', 'YouTube influencer', etc.)")
     parser.add_argument("--voiceover", action="store_true", help="Generate a voiceover script instead of a summary.")
+    parser.add_argument("--voiceover-audio", action="store_true", help="Generate TTS audio for the voiceover script, aligned to video events.")
     args = parser.parse_args()
 
 
@@ -54,11 +55,18 @@ def main():
         return
 
     from summarizer import summarize_chunked, generate_voiceover_script, generate_voiceover_script_chunked
+    from tts import generate_timed_voiceover, tts_openai
     if args.voiceover:
         if args.chunked:
-            print(f"Voiceover script (chunked, style: {args.style}):\n", generate_voiceover_script_chunked(timeline, style=args.style))
+            script = generate_voiceover_script_chunked(timeline, style=args.style)
         else:
-            print(f"Voiceover script (style: {args.style}):\n", generate_voiceover_script(timeline, style=args.style))
+            script = generate_voiceover_script(timeline, style=args.style)
+        print(f"Voiceover script (style: {args.style}):\n", script)
+        if args.voiceover_audio:
+            print("Generating timed voiceover audio...")
+            audio_segments = generate_timed_voiceover(timeline, script, tts_func=tts_openai)
+            for ts, audio_path in audio_segments:
+                print(f"Audio segment at {ts:.2f}s: {audio_path}")
     else:
         if args.chunked:
             print("Summary (chunked):\n", summarize_chunked(timeline))
